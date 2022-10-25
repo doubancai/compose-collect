@@ -1,0 +1,13 @@
+version: "3"
+services:
+  flume:
+    build:
+      context: ./services/flume
+    volumes:
+      - ./code/localhost/flume/:/var/flume/
+    command:
+      - /bin/bash
+      - -c
+      - |
+        flume-ng agent -n a1 -c /opt/flume/conf -f /var/flume/conf/test.conf -Dflume.root.logger=INFO,console
+
