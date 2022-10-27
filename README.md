@@ -47,7 +47,7 @@ kafka-topics.sh --create --zookeeper compose-collect-zookeeper-1:2181 --replicat
 3.消费
 
 ```
-/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --from-beginning --topic test-flume
+kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --from-beginning --topic test-flume
 ```
 
 source中向test_1.log文件新增内容，将打印到消费客户端
