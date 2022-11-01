@@ -93,3 +93,88 @@ kafka-consumer-groups.sh --bootstrap-server 127.0.0.1:9092 --list
 kafka-consumer-groups.sh --bootstrap-server 127.0.0.1:9092 --describe --group console-consumer-9542
 ```
 
+
+
+## ClickHouse
+
+1.拷贝容器内配置文件到宿主机
+
+```
+docker run -it --rm  --name temp-clickhouse-server --ulimit nofile=262144:262144 clickhouse/clickhouse-server:22.10.1.1877 /bin/bash
+
+docker cp temp-clickhouse-server:/etc/clickhouse-server/ ./services/ch-server/
+```
+
+2.server启动后进入click
+
+```
+docker exec -it compose-collect-ch-server-1 clickhouse-client
+```
+
+3.建表
+
+```
+-- 创建数据库
+create database test;
+
+-- 创建消费kafka数据表
+CREATE TABLE test.flume_consumer (
+    id UInt64,
+    msg String,
+    dt UInt64
+)
+ENGINE = Kafka
+SETTINGS kafka_broker_list = 'kafka:9092',
+    kafka_topic_list = 'test-flume',
+    kafka_group_name = 'flume_consumer',
+    kafka_format = 'JSONEachRow',
+    kafka_skip_broken_messages = 1,
+    kafka_num_consumers = 2;
+
+-- 创建存储数据表
+CREATE TABLE test.flume (
+    id UInt64,
+    msg String,
+    dt DateTime
+) Engine = ReplacingMergeTree() PARTITION BY toYYYYMMDD(dt) ORDER BY (dt, id);
+
+
+-- 创建视图从消费表导出到存储表
+CREATE MATERIALIZED VIEW test.flume_view TO test.flume AS
+SELECT
+    id,
+    msg,
+    fromUnixTimestamp64Milli(dt) as dt
+FROM test.flume_consumer;
+```
+
+4.source中向test_1.log文件新增内容
+
+```
+{"id":1,"msg":"1","dt":1666865462000}
+{"id":1,"msg":"2","dt":1666865462000}
+{"id":2,"msg":"2","dt":1666865462000}
+```
+
+5.查询
+
+```
+select * from test.flume;
+
+# 强制分区合并后查询
+optimize table test.flume FINAL;
+select * from test.flume;
+```
+
+维护
+
+```
+1.停止kafka消息写入,避免大量消息堆积
+2.卸载视图,停止接收kafka消息
+DETACH TABLE test.flume_view;
+恢复
+1.恢复视图
+ATTACH TABLE test.flume_view;
+2.启动kafka
+```
+

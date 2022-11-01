@@ -49,5 +49,20 @@ services:
       - "8048:8048"
     depends_on:
       - kafka
+  ch-server:
+    image: clickhouse/clickhouse-server:22.10.1.1877
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./services/ch-server:/etc/clickhouse-server
+      - ./data/ch-server:/var/lib/clickhouse
+      - ./logs/ch-server:/var/log/clickhouse-server
+    ports:
+      - 8123:8123
+      - 9000:9000
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
 
 
