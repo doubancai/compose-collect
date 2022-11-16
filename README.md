@@ -32,19 +32,27 @@ flume-ng agent -n a1 -c /opt/flume/conf -f /var/flume/conf/test.conf -Dflume.roo
 
 ## Kafka
 
-1.进入容器
+1.拷贝容器内配置文件到宿主机
+
+```
+docker run -it --rm  --name temp-kafka wurstmeister/kafka:2.13-2.8.1 /bin/bash
+
+docker cp temp-kafka:/opt/kafka/config/ ./services/kafka/
+```
+
+2.进入容器
 
 ```
 docker exec -it compose-collect-kafka-1 /bin/bash
 ```
 
-2.创建topic
+3.创建topic
 
 ```
 kafka-topics.sh --create --zookeeper compose-collect-zookeeper-1:2181 --replication-factor 1 --partitions 3 --topic test-flume
 ```
 
-3.消费
+4.消费
 
 ```
 kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --from-beginning --topic test-flume
@@ -72,6 +80,8 @@ kafka-topics.sh --delete --zookeeper compose-collect-zookeeper-1:2181 --topic te
 kafka-console-producer.sh --broker-list 127.0.0.1:9092 --topic test-1
 # 消费
 kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --from-beginning --topic test-1
+# 从指定分区指定offset开始消费
+kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic test-1 --partition 0 --offset 10
 ```
 
 ```
@@ -91,6 +101,22 @@ kafka-configs.sh --bootstrap-server 127.0.0.1:9092 --entity-type topics --entity
 kafka-consumer-groups.sh --bootstrap-server 127.0.0.1:9092 --list
 # 查看消费者组详情
 kafka-consumer-groups.sh --bootstrap-server 127.0.0.1:9092 --describe --group console-consumer-9542
+
+# 设置消费组从多个分区指定offset开始消费（关闭消费后执行）
+kafka-consumer-groups.sh --bootstrap-server localhost:9092 --group console-consumer-9542 --reset-offsets –-topic test-1:0,1,2 --to-offset 10 --execute
+# 设置消费组从某个分区指定offset开始消费（关闭消费后执行）
+kafka-consumer-groups.sh --bootstrap-server localhost:9092 --group console-consumer-9542 --reset-offsets –-topic test-1:0 --to-offset 10 --execute
+
+```
+
+
+
+## metabase
+
+创建数据库
+
+```
+CREATE DATABASE metabase CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 

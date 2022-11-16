@@ -1,17 +1,23 @@
 version: "3"
 services:
-  flume:
-    build:
-      context: ./services/flume
-    environment:
-      - TZ=Asia/Shanghai
-    volumes:
-      - ./code/localhost/flume/:/var/flume/
-    command:
-      - /bin/bash
-      - -c
-      - |
-        flume-ng agent -n a1 -c /opt/flume/conf -f /var/flume/conf/test.conf -Dflume.root.logger=INFO,console
+  # flume:
+  #   build:
+  #     context: ./services/flume
+  #   environment:
+  #     - TZ=Asia/Shanghai
+  #   volumes:
+  #     - ./code/flume-rtb/:/var/flume-rtb/
+  #     - ./code/flume-rtb/jar/flume-taildir-source-1.9.0.jar:/opt/flume/lib/flume-taildir-source-1.9.0.jar
+  #     - ./code/localhost/flume/:/var/flume/
+  #   command:
+  #     - /bin/bash
+  #     - -c
+  #     - |
+  #       bash /var/flume-rtb/script/flume_start.sh test1-t1 dev &
+  #       bash /var/flume-rtb/script/flume_start.sh rtb-click dev &
+  #       bash /var/flume-rtb/script/flume_start.sh rtb-pv dev &
+  #       bash /var/flume-rtb/script/flume_start.sh rtb-req dev &
+  #       flume-ng agent -n a1 -c /opt/flume/conf -f /var/flume/conf/test.conf -Dflume.root.logger=INFO,console
   zookeeper:
     image: wurstmeister/zookeeper
     environment:
@@ -29,26 +35,17 @@ services:
       - KAFKA_ADVERTISED_LISTENERS=INSIDE://kafka:9092,OUTSIDE://localhost:9093
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
       - KAFKA_INTER_BROKER_LISTENER_NAME=INSIDE
-      - JMX_PORT=9999
+      # - JMX_PORT=9999
       - TZ=Asia/Shanghai
     volumes:
       - ./data/kafka:/kafka
+      - ./logs/kafka:/opt/kafka/logs
     ports:
       - 9092:9092
       - 9093:9093
-      - 9999:9999
+      # - 9999:9999
     depends_on:
       - zookeeper
-  efak:
-    build:
-      context: ./services/efak
-    environment:
-      - EFAK_CLUSTER_ZK_LIST=zookeeper:2181
-      - TZ=Asia/Shanghai
-    ports:
-      - "8048:8048"
-    depends_on:
-      - kafka
   ch-server:
     image: clickhouse/clickhouse-server:22.10.1.1877
     environment:
@@ -64,5 +61,46 @@ services:
       nofile:
         soft: 262144
         hard: 262144
+  mysql80:
+    image: mysql:8.0.30
+    volumes:
+      - ./services/mysql80/my.cnf:/etc/mysql/my.cnf
+      - ./data/mysql80/:/var/lib/mysql/:rw
+    ports:
+      - 3306:3306
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DOCKER_MYSQL_PASSPORD}
+      - TZ=Asia/Shanghai
+    security_opt:
+      - seccomp:unconfined
+  efak:
+    build:
+      context: ./services/efak
+    environment:
+      - TZ=Asia/Shanghai
+      - EFAK_CLUSTER_ZK_LIST=zookeeper:2181
+      - EFAK_DB_DRIVER=com.mysql.cj.jdbc.Driver
+      - EFAK_DB_URL=jdbc:mysql://mysql80:3306/ke?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull
+      - EFAK_DB_USERNAME=${DOCKER_MYSQL_USER}
+      - EFAK_DB_PASSWORD=${DOCKER_MYSQL_PASSPORD}
+    ports:
+      - "8048:8048"
+    depends_on:
+      - kafka
+      - mysql80
+  metabase:
+    build:
+      context: ./services/metabase
+    environment:
+      - TZ=Asia/Shanghai
+      - MB_DB_CONNECTION_URI=jdbc:mysql://mysql80:3306/metabase
+      - MB_DB_USER=${DOCKER_MYSQL_USER}
+      - MB_DB_PASS=${DOCKER_MYSQL_PASSPORD}
+    ports:
+      - 8040:3000
+    depends_on:
+      - ch-server
+      - mysql80
 
 
